@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Emergency Route Finder</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#1d3557;--muted:#5b6b82;--line:#dbe2ec;--road:#b0b7c3;--route:#06d6a0;--hosp:#ef476f;--place:#8ecae6;--start:#1d3557;--dest:#d00000;--code:#0f1b2d;--codeink:#d7e3f4;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1624;--card:#16213a;--ink:#e6eefb;--muted:#9fb0c9;--line:#27385a;--road:#5d6b85;--start:#7cc4ff;--dest:#ff6b6b;--code:#0a111d}}
+:root[data-theme="dark"]{--bg:#0e1624;--card:#16213a;--ink:#e6eefb;--muted:#9fb0c9;--line:#27385a;--road:#5d6b85;--start:#7cc4ff;--dest:#ff6b6b;--code:#0a111d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.hero{background:linear-gradient(135deg,#1d3557,#457b9d);color:#fff;border-radius:16px;padding:22px 26px;margin-bottom:16px}
+.hero h1{margin:0;font-size:1.8rem}.hero p{margin:.4rem 0 0;opacity:.92}
+.grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+select,button{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1rem}
+.modes{display:flex;gap:6px}.modes button{padding:8px;font-size:.85rem;cursor:pointer}
+.modes button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+#go{margin-top:16px;background:#e63946;color:#fff;border:0;font-weight:700;cursor:pointer}
+#go:hover{filter:brightness(1.1)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat small{color:var(--muted);text-transform:uppercase;font-size:.7rem;letter-spacing:.05em}.stat b{display:block;font-size:1.15rem}
+.route{margin-bottom:12px;font-weight:600}.route span{display:inline-block;background:rgba(6,214,160,.18);padding:2px 10px;border-radius:99px;margin:2px}
+.err{background:rgba(230,57,70,.12);border:1px solid #e63946;border-radius:12px;padding:12px;margin-bottom:12px}
+.note{font-size:.8rem;color:var(--muted)}
+svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted);margin-top:8px}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+h2{margin:22px 0 8px;font-size:1.25rem}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-size:.75rem;text-transform:uppercase}
+tr.hl td{background:rgba(6,214,160,.15)}
+pre{background:var(--code);color:var(--codeink);padding:14px;border-radius:12px;overflow-x:auto;font-size:.82rem;line-height:1.55;margin:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.two{grid-template-columns:1fr}}
+ol,ul{margin:.3rem 0;padding-left:1.2rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero"><h1>🚑 Smart Emergency Route Finder</h1>
+<p>Shortest road route to a hospital using <b>Dijkstra’s algorithm</b> on a simulated city. DAA mini-project, academic prototype.</p></div>
+
+<div class="grid">
+ <div class="card">
+  <label>Starting location</label><select id="start"></select>
+  <label>Destination</label>
+  <div class="modes"><button id="m1" class="on">Choose hospital</button><button id="m2">Nearest hospital</button></div>
+  <div id="hospWrap"><label>Hospital</label><select id="hosp"></select></div>
+  <button id="go">Find shortest route</button>
+  <p class="note" style="margin-top:12px">Distance is shortest road length in km, not travel time. Traffic and hospital availability are not considered.</p>
+ </div>
+ <div>
+  <div id="result"></div>
+  <div class="card"><svg id="map" viewBox="0 0 760 470" role="img" aria-label="Road network map"></svg>
+   <div class="legend"><span><i class="dot" style="background:var(--place)"></i>Place</span><span><i class="dot" style="background:var(--hosp)"></i>Hospital</span><span><i class="dot" style="background:var(--route)"></i>Shortest route</span><span><i class="dot" style="border:3px solid var(--start)"></i>Start</span><span><i class="dot" style="border:3px solid var(--dest)"></i>Destination</span></div></div>
+ </div>
+</div>
+
+<h2>🔎 How Dijkstra worked on this query (live trace)</h2>
+<div class="card scroll"><table id="trace"></table>
+<p class="note">Each row = one place taken from the priority queue (smallest distance first). “Updates” are the roads relaxed: a shorter distance was found.</p></div>
+
+<h2>💻 The actual code running this page</h2>
+<div class="card"><pre id="code"></pre></div>
+
+<div class="two">
+ <div><h2>📘 Algorithm in 5 steps</h2><div class="card"><ol>
+  <li>Source distance = 0; every other place = ∞.</li>
+  <li>Take the unvisited place with the smallest distance (priority queue).</li>
+  <li><b>Relax</b> its roads: if dist[u] + km &lt; dist[v], update dist[v] and prev[v] = u.</li>
+  <li>Repeat until the queue is empty.</li>
+  <li>Rebuild the route by following <code>prev</code> from destination back to source.</li></ol></div></div>
+ <div><h2>⏱ Analysis</h2><div class="card"><ul>
+  <li><b>Graph:</b> adjacency list (sparse road network, O(V+E) memory).</li>
+  <li><b>Time:</b> O((V+E) log V) with a binary heap. <b>Space:</b> O(V+E).</li>
+  <li><b>Needs non-negative weights</b>, because the greedy choice assumes distances never shrink later.</li>
+  <li><b>Limits:</b> no traffic, closures, or hospital capacity. Fictional data.</li></ul></div></div>
+</div>
+</div>
+
+<script>
+// ---------- Sample fictional network: name -> [x, y, isHospital] ----------
+const PLACES = {
+  "Green Park":[70,210,0],"Market":[260,140,0],"College":[110,390,0],"Bus Station":[330,280,0],
+  "Rose Colony":[300,435,0],"Railway Station":[545,300,0],"City Hospital":[520,120,1],
+  "Lifeline Hospital":[690,410,1],"Sunrise Hospital":[400,45,1],"Hamlet":[690,160,0]
+};
+const ROADS = [
+  ["Green Park","Market",2],["Green Park","College",4],["Market","Bus Station",1.5],
+  ["Market","City Hospital",5],["College","Bus Station",2.5],["College","Rose Colony",3],
+  ["Bus Station","Railway Station",2],["Bus Station","City Hospital",3],
+  ["Railway Station","City Hospital",2.5],["Railway Station","Lifeline Hospital",5],
+  ["Rose Colony","Lifeline Hospital",4],["Market","Sunrise Hospital",6],["Rose Colony","Sunrise Hospital",7]
+];
+const HOSPITALS = Object.keys(PLACES).filter(p => PLACES[p][2]);
+
+// Adjacency list (roads work both ways). "Hamlet" has no road: unreachable demo.
+const graph = {};
+for (const p in PLACES) graph[p] = [];
+for (const [a,b,km] of ROADS) { graph[a].push([b,km]); graph[b].push([a,km]); }
+
+// Min-heap = the priority queue (smallest distance on top)
+class MinHeap {
+  constructor(){ this.a = []; }
+  get size(){ return this.a.length; }
+  push(x){ const a=this.a; a.push(x); let i=a.length-1;
+    while(i>0){ const p=(i-1)>>1; if(a[p][0]<=a[i][0]) break; [a[p],a[i]]=[a[i],a[p]]; i=p; } }
+  pop(){ const a=this.a, top=a[0], last=a.pop();
+    if(a.length){ a[0]=last; let i=0;
+      for(;;){ const l=2*i+1, r=l+1; let m=i;
+        if(l<a.length && a[l][0]<a[m][0]) m=l;
+        if(r<a.length && a[r][0]<a[m][0]) m=r;
+        if(m===i) break; [a[m],a[i]]=[a[i],a[m]]; i=m; } }
+    return top; }
+}
+
+function dijkstra(graph, source, log) {
+  const dist = {}, prev = {};
+  for (const p in graph) { dist[p] = Infinity; prev[p] = null; } // all = infinity
+  dist[source] = 0;                                   // source = 0
+  const heap = new MinHeap();
+  heap.push([0, source]);                             // (distance, place)
+  while (heap.size) {
+    const [d, u] = heap.pop();                        // closest unprocessed place
+    if (d > dist[u]) continue;                        // outdated entry, skip
+    const updates = [];
+    for (const [v, km] of graph[u]) {                 // look at every road from u
+      if (d + km < dist[v]) {                         // shorter way to v found?
+        dist[v] = d + km;                             // relax: update distance
+        prev[v] = u;                                  // remember where we came from
+        heap.push([dist[v], v]);
+        updates.push(v + " = " + dist[v]);
+      }
+    }
+    if (log) log.push({u, d, updates});
+  }
+  return {dist, prev};
+}
+
+function getPath(prev, source, target) {
+  const path = [];
+  for (let n = target; n !== null; n = prev[n]) path.push(n);
+  path.reverse();
+  return path[0] === source ? path : [];              // [] = unreachable
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+let mode = 1;
+const starts = Object.keys(PLACES).filter(p => !HOSPITALS.includes(p));
+$("start").innerHTML = starts.map(p => `<option>${p}</option>`).join("");
+$("hosp").innerHTML = HOSPITALS.map(p => `<option>${p}</option>`).join("");
+$("m1").onclick = () => setMode(1); $("m2").onclick = () => setMode(2);
+function setMode(m){ mode=m; $("m1").classList.toggle("on",m===1); $("m2").classList.toggle("on",m===2);
+  $("hospWrap").style.display = m===1 ? "block" : "none"; }
+
+function drawMap(path) {
+  const routeSet = new Set(); for (let i=0;i<path.length-1;i++) routeSet.add(path[i]+"|"+path[i+1]), routeSet.add(path[i+1]+"|"+path[i]);
+  let s = "";
+  for (const [a,b,km] of ROADS) { const [x1,y1]=PLACES[a], [x2,y2]=PLACES[b], on=routeSet.has(a+"|"+b);
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${on?"var(--route)":"var(--road)"}" stroke-width="${on?7:2.5}" stroke-linecap="round"/>`; }
+  for (const [a,b,km] of ROADS) { const [x1,y1]=PLACES[a], [x2,y2]=PLACES[b];
+    s += `<text x="${(x1+x2)/2}" y="${(y1+y2)/2+4}" font-size="12" font-weight="700" text-anchor="middle" fill="var(--ink)" stroke="var(--card)" stroke-width="4" paint-order="stroke">${km}</text>`; }
+  for (const p in PLACES) { const [x,y,h]=PLACES[p];
+    const ring = path[0]===p ? "var(--start)" : path[path.length-1]===p && path.length ? "var(--dest)" : "var(--card)";
+    s += `<circle cx="${x}" cy="${y}" r="20" fill="${h?"var(--hosp)":"var(--place)"}" stroke="${ring}" stroke-width="${ring==="var(--card)"?2:5}"/>`;
+    if (h) s += `<text x="${x}" y="${y+5}" font-size="14" font-weight="800" text-anchor="middle" fill="#fff">H</text>`;
+    s += `<text x="${x}" y="${y+38}" font-size="12" font-weight="600" text-anchor="middle" fill="var(--ink)" stroke="var(--bg)" stroke-width="3" paint-order="stroke">${p}</text>`; }
+  $("map").innerHTML = s;
+}
+
+function run() {
+  const src = $("start").value, log = [];
+  const {dist, prev} = dijkstra(graph, src, log);
+  let dest = $("hosp").value;
+  if (mode === 2) dest = HOSPITALS.reduce((best, h) => dist[h] < dist[best] ? h : best, HOSPITALS[0]); // nearest
+  let path = [];
+  if (dist[dest] === Infinity) {
+    $("result").innerHTML = `<div class="err"><b>No route found.</b> No road connects “${src}” to ${mode===2?"any hospital":"“"+dest+"”"} (road closed or isolated area).</div>`;
+  } else {
+    path = getPath(prev, src, dest);
+    $("result").innerHTML = `<div class="stats"><div class="stat"><small>Hospital</small><b>${dest}</b></div>
+      <div class="stat"><small>Shortest distance</small><b>${dist[dest]} km</b></div>
+      <div class="stat"><small>Roads used</small><b>${path.length-1}</b></div></div>
+      <div class="route">Route: ${path.map(p=>`<span>${p}</span>`).join(" ➜ ")}</div>`;
+  }
+  drawMap(path);
+  const onRoute = new Set(path);
+  $("trace").innerHTML = `<tr><th>#</th><th>Place picked</th><th>Distance (km)</th><th>Updates</th></tr>` +
+    log.map((r,i)=>`<tr class="${onRoute.has(r.u)?"hl":""}"><td>${i+1}</td><td>${r.u}</td><td>${r.d}</td><td>${r.updates.join(", ")||"–"}</td></tr>`).join("");
+}
+$("go").onclick = run;
+$("code").textContent = dijkstra.toString() + "\n\n" + getPath.toString();
+$("start").value = "Green Park"; $("hosp").value = "City Hospital"; setMode(1); run();
+</script>
+</body>
+</html>
